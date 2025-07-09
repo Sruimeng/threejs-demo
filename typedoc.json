@@ -1,0 +1,12 @@
+{
+  "name": "Sruim FBX2glTF API",
+  "entryPoints": [
+    "src/index.ts",
+  ],
+  "out": "api",
+  "includeVersion": true,
+  "excludeExternals": true,
+  "navigationLinks": {
+    "Source code": "https://github.com/Sruimeng/FBX2glTF"
+  }
+}
