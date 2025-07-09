@@ -56,10 +56,19 @@
   ],
   "author": "Sruim",
   "scripts": {
-    "dev": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "dev": "vite",
+    "preview": "concurrently \"vite build\" \"sleep 6 && vite preview\"",
+    "prebuild": "pnpm clean",
+    "build": "pnpm build:declaration && pnpm build:module",
+    "build:module": "rollup -c",
+    "build:declaration": "tsc -d --emitDeclarationOnly",
+    "build:docs": "pnpm build && typedoc",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check:ts": "tsc -b ./tsconfig.check.json",
+    "clean": "rimraf dist",
+    "prepare": "husky install",
+    "prepublishOnly": "pnpm build"
   },
   "eslintConfig": {
     "extends": [
