@@ -6,7 +6,7 @@ import { ModelViewer } from '../../src/componets/ModelViewer';
 
 const models = {
   Helmet: '../assets/3bbaadad912f57a039a7d5d9da4a1fcb.glb',
-  Sponza: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Sponza/glTF-Binary/Sponza.glb',
+  Sponza: '../assets/frog.glb',
 };
 
 const App = () => {

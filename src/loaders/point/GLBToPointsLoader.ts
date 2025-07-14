@@ -1,11 +1,19 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../gltf';
+import { PointCloudMaterial } from '../../materials/PointCloudMaterial';
 
 export class GLBToPointsLoader extends THREE.Loader {
-  public density: number = 100; // Default density: points per square unit
+  public density: number = 100;
+  public maxPoints: number = 500000; // 限制最大点数
+  public minPoints: number = 100000;  // 保证最小点数
 
   public setDensity(density: number) {
     this.density = density;
+    return this;
+  }
+
+  public setMaxPoints(max: number) {
+    this.maxPoints = max;
     return this;
   }
 
@@ -89,19 +97,54 @@ export class GLBToPointsLoader extends THREE.Loader {
       }
     });
 
-    const allVertices = new Float32Array(sampledPoints.length * 3);
-    for (let i = 0; i < sampledPoints.length; i++) {
-      sampledPoints[i].toArray(allVertices, i * 3);
+    // 智能采样：限制点数范围
+    let finalPoints = sampledPoints;
+    if (sampledPoints.length > this.maxPoints) {
+      finalPoints = this.downsample(sampledPoints, this.maxPoints);
+    } else if (sampledPoints.length < this.minPoints) {
+      // 如果点太少，适当增加密度
+      this.density *= 2;
+      console.warn(`Point count too low (${sampledPoints.length}), doubling density`);
+    }
+
+    const allVertices = new Float32Array(finalPoints.length * 3);
+    for (let i = 0; i < finalPoints.length; i++) {
+      finalPoints[i].toArray(allVertices, i * 3);
     }
 
     const pointsGeometry = new THREE.BufferGeometry();
     pointsGeometry.setAttribute('position', new THREE.BufferAttribute(allVertices, 3));
 
-    const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.0001, sizeAttenuation: true });
+    // 根据点数调整点大小
+    const pointSize = Math.max(0.005, Math.min(0.02, 50000 / finalPoints.length * 0.01));
+    
+    const material = new PointCloudMaterial({ 
+      color1: new THREE.Color(0x00ffff), 
+      color2: new THREE.Color(0xffffff), 
+      pointSize: pointSize, 
+      opacity: 0.8 
+    });
+    
     const points = new THREE.Points(pointsGeometry, material);
     points.name = 'Sampled_Point_Cloud';
 
+    console.log(`Generated ${finalPoints.length} points with size ${pointSize.toFixed(4)}`);
+
     return points;
+  }
+
+  private downsample(points: THREE.Vector3[], targetCount: number): THREE.Vector3[] {
+    if (points.length <= targetCount) return points;
+    
+    const step = points.length / targetCount;
+    const result: THREE.Vector3[] = [];
+    
+    for (let i = 0; i < targetCount; i++) {
+      const index = Math.floor(i * step);
+      result.push(points[index]);
+    }
+    
+    return result;
   }
 
   private sampleTriangle(triangle: THREE.Triangle, target: THREE.Vector3[]) {
@@ -115,12 +158,6 @@ export class GLBToPointsLoader extends THREE.Loader {
     }
   }
 
-  /**
-   * A custom implementation of the Triangle.sample() method to avoid dependency issues.
-   * Samples a random point inside the triangle using barycentric coordinates.
-   * @param triangle The triangle to sample from.
-   * @param target The Vector3 to store the result in.
-   */
   private samplePointInTriangle(triangle: THREE.Triangle, target: THREE.Vector3): THREE.Vector3 {
     let u = Math.random();
     let v = Math.random();
