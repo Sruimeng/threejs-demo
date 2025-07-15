@@ -163,7 +163,7 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
         // 计算视图空间位置
         vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
         
-        // 颜色过渡（从科技感颜色到更自然的颜色）
+        // 颜色过渡
         float colorNoise = fbm(position * 1.5 + vec3(uTime * 0.2));
         float colorMix = 0.4 + 0.2 * colorNoise * (1.0 - smoothProgress);
         

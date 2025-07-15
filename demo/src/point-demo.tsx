@@ -5,7 +5,7 @@ import { Button, Slider, Space } from 'antd';
 import { ModelViewer } from '../../src/componets/ModelViewer';
 
 const models = {
-  Helmet: '../assets/3bbaadad912f57a039a7d5d9da4a1fcb.glb',
+  Helmet: '../assets/tripo_logo.glb',
   Sponza: '../assets/frog.glb',
 };
 

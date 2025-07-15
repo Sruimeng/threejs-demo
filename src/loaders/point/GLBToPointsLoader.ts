@@ -4,8 +4,8 @@ import { PointCloudMaterial } from '../../materials/PointCloudMaterial';
 
 export class GLBToPointsLoader extends THREE.Loader {
   public density: number = 100;
-  public maxPoints: number = 500000; // 限制最大点数
-  public minPoints: number = 100000;  // 保证最小点数
+  public maxPoints: number = 50000; // 限制最大点数
+  public minPoints: number = 1000;  // 保证最小点数
 
   public setDensity(density: number) {
     this.density = density;
@@ -56,80 +56,33 @@ export class GLBToPointsLoader extends THREE.Loader {
 
     gltfLoader.parse(data, path, (gltf) => {
       const points = this.convertSceneToPoints(gltf.scene);
+      console.log(`Converted GLB to points: ${points.geometry.attributes.position.count} points`);
+      
       onLoad(points);
     }, gltfOnError);
   }
 
   private convertSceneToPoints(scene: THREE.Group): THREE.Points {
-    const sampledPoints: THREE.Vector3[] = [];
-    const triangle = new THREE.Triangle();
 
     scene.updateWorldMatrix(true, true);
+    let points: THREE.Points;
 
     scene.traverse((object: THREE.Object3D) => {
-      if (object instanceof THREE.Mesh) {
-        const geometry = object.geometry;
-        const positions = geometry.attributes.position;
-        const index = geometry.index;
-
-        if (!positions) return;
-
-        object.updateWorldMatrix(true, false);
-        const matrixWorld = object.matrixWorld;
-
-        if (index) {
-          for (let i = 0; i < index.count; i += 3) {
-            const vA = new THREE.Vector3().fromBufferAttribute(positions, index.getX(i)).applyMatrix4(matrixWorld);
-            const vB = new THREE.Vector3().fromBufferAttribute(positions, index.getX(i + 1)).applyMatrix4(matrixWorld);
-            const vC = new THREE.Vector3().fromBufferAttribute(positions, index.getX(i + 2)).applyMatrix4(matrixWorld);
-            triangle.set(vA, vB, vC);
-            this.sampleTriangle(triangle, sampledPoints);
-          }
-        } else {
-          for (let i = 0; i < positions.count; i += 3) {
-            const vA = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(matrixWorld);
-            const vB = new THREE.Vector3().fromBufferAttribute(positions, i + 1).applyMatrix4(matrixWorld);
-            const vC = new THREE.Vector3().fromBufferAttribute(positions, i + 2).applyMatrix4(matrixWorld);
-            triangle.set(vA, vB, vC);
-            this.sampleTriangle(triangle, sampledPoints);
-          }
-        }
+      if (object instanceof THREE.Points) {
+        points = object;
       }
-    });
-
-    // 智能采样：限制点数范围
-    let finalPoints = sampledPoints;
-    if (sampledPoints.length > this.maxPoints) {
-      finalPoints = this.downsample(sampledPoints, this.maxPoints);
-    } else if (sampledPoints.length < this.minPoints) {
-      // 如果点太少，适当增加密度
-      this.density *= 2;
-      console.warn(`Point count too low (${sampledPoints.length}), doubling density`);
-    }
-
-    const allVertices = new Float32Array(finalPoints.length * 3);
-    for (let i = 0; i < finalPoints.length; i++) {
-      finalPoints[i].toArray(allVertices, i * 3);
-    }
-
-    const pointsGeometry = new THREE.BufferGeometry();
-    pointsGeometry.setAttribute('position', new THREE.BufferAttribute(allVertices, 3));
-
-    // 根据点数调整点大小
-    const pointSize = Math.max(0.005, Math.min(0.02, 50000 / finalPoints.length * 0.01));
+    }); 
     
     const material = new PointCloudMaterial({ 
       color1: new THREE.Color(0x00ffff), 
       color2: new THREE.Color(0xffffff), 
-      pointSize: pointSize, 
+      pointSize: 1, 
       opacity: 0.8 
     });
+
+    points.material = material;
     
-    const points = new THREE.Points(pointsGeometry, material);
     points.name = 'Sampled_Point_Cloud';
-
-    console.log(`Generated ${finalPoints.length} points with size ${pointSize.toFixed(4)}`);
-
     return points;
   }
 
