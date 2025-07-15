@@ -12,8 +12,10 @@
 /build
 /temp
 /.vscode
+/.claude
 
 # misc
+*.d.ts
 .DS_Store
 .env.local
 .env.development.local
