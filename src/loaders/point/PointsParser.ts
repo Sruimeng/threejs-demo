@@ -1,34 +1,47 @@
 import { GLTFParser } from '../gltf/GLTF-parser';
 import type { GLTFJsonData } from '../gltf/constants';
 import type { GLTFLoaderOptions } from '../gltf/constants';
-import * as THREE from 'three';
 import {
   BufferAttribute,
   BufferGeometry,
+  Color,
+  Group,
+  Line,
+  Mesh,
   Points,
-  PointsMaterial,
+  SkinnedMesh,
 } from 'three';
+import { PointCloudMaterial } from './PointCloudMaterial';
 
 /**
  * 点数据专用的GLTF解析器
  * 继承自GLTFParser，但专门处理点数据
  */
 export class PointsParser extends GLTFParser {
+  material: PointCloudMaterial;
   constructor(json: GLTFJsonData = {
     asset: {
       version: [],
     },
   }, options: GLTFLoaderOptions) {
     super(json, options);
+        this.material = new PointCloudMaterial({
+      color1: new Color(0x00ffff),
+      color2: new Color(0xffffff),
+      pointSize: 4,
+      opacity: 0.8,
+      flowSpeed: 1.4,
+      noiseScale: 3.0,
+      flowStrength: 0.1,
+      transitionProgress: 0.0,
+    })
   }
 
   /**
-   * 重写parse方法，专门处理点数据
+   * 处理点数据
    */
-  override parse(onLoad: (result: any) => void, onError: (error: Error) => void, wireframe?: boolean): void {
+  override parse(onLoad: (result: any) => void, onError: (error: Error) => void): void {
     const json = this.json;
-    const extensions = this.extensions;
-    this.wireframe = wireframe;
 
     // 清除加载器缓存
     this.cache.removeAll();
@@ -68,101 +81,130 @@ export class PointsParser extends GLTFParser {
   }
 
   /**
-   * 加载点数据
-   */
-  private async loadPointsData(): Promise<Points> {
-    // 查找所有点相关的网格
-    const json = this.json;
-    const meshes = json.meshes || [];
-    const pointsMeshes = meshes.filter(mesh => 
-      mesh.primitives && mesh.primitives.some(primitive => primitive.mode === 0) // POINTS = 0
-    );
+ * 加载点数据
+ */
+private async loadPointsData(): Promise<Points> {
+  // 查找所有点相关的网格
+  const json = this.json;
+  const meshes = json.meshes || [];
+  const pointsMeshes = meshes.filter(mesh => 
+    mesh.primitives && mesh.primitives.some(primitive => primitive.mode === 0) // POINTS = 0
+  );
 
-    if (pointsMeshes.length === 0) {
-      // 如果没有点数据，从网格几何体创建点
-      return this.createPointsFromMeshes();
-    }
+  if (pointsMeshes.length === 0) {
+    // 如果没有点数据，从网格几何体创建点
+    return this.createPointsFromMeshes();
+  }
 
-    // 加载所有点网格
-    const allPoints: number[] = [];
+  // 收集所有需要加载的原始体
+  const primitivePromises: Promise<Float32Array>[] = [];
+  
+  for (const mesh of pointsMeshes) {
+    const primitives = mesh.primitives || [];
     
-    for (const mesh of pointsMeshes) {
-      const primitives = mesh.primitives || [];
-      
-      for (const primitive of primitives) {
-        if (primitive.mode === 0) { // POINTS
-          const geometry = await this.loadPrimitiveGeometry(primitive);
-          const positions = geometry.attributes.position;
-          
-          if (positions) {
-            for (let i = 0; i < positions.count; i++) {
-              allPoints.push(
-                positions.getX(i),
-                positions.getY(i),
-                positions.getZ(i)
-              );
+    for (const primitive of primitives) {
+      if (primitive.mode === 0) { // POINTS
+        // 创建一个Promise来处理每个原始体
+        const primitivePromise = this.loadPrimitiveGeometry(primitive)
+          .then(geometry => {
+            const positions = geometry.attributes.position;
+            if (positions && positions.array) {
+              return new Float32Array(positions.array);
             }
-          }
-        }
+            return new Float32Array();
+          })
+          .catch(error => {
+            console.warn('加载原始体几何体失败:', error);
+            return new Float32Array();
+          });
+        
+        primitivePromises.push(primitivePromise);
       }
     }
-
-    if (allPoints.length === 0) {
-      throw new Error('PointsParser: 未找到点数据');
-    }
-
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new BufferAttribute(new Float32Array(allPoints), 3)
-    );
-
-    const material = new PointsMaterial({ color: 0xffffff, size: 1 });
-    return new Points(geometry, material);
   }
 
-  /**
-   * 从网格几何体创建点
-   */
-  private async createPointsFromMeshes(): Promise<Points> {
-    const json = this.json;
-    const meshes = json.meshes || [];
-    const allPositions: number[] = [];
-    
-    for (let i = 0; i < meshes.length; i++) {
-      const mesh = await this.loadMesh(i);
-      
-      mesh.traverse((object: any) => {
-        if (object.isMesh || object.isPoints) {
-          const geometry = object.geometry;
-          const positions = geometry.attributes.position;
-          
-          if (positions) {
-            for (let j = 0; j < positions.count; j++) {
-              allPositions.push(
-                positions.getX(j),
-                positions.getY(j),
-                positions.getZ(j)
-              );
+  // 等待所有原始体加载完成
+  const positionArrays = await Promise.all(primitivePromises);
+  
+  // 合并所有位置数据
+  const totalLength = positionArrays.reduce((sum, arr) => sum + arr.length, 0);
+  
+  if (totalLength === 0) {
+    throw new Error('PointsParser: 未找到有效的点数据');
+  }
+
+  const allPoints = new Float32Array(totalLength);
+  let offset = 0;
+  
+  for (const positions of positionArrays) {
+    if (positions.length > 0) {
+      allPoints.set(positions, offset);
+      offset += positions.length;
+    }
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new BufferAttribute(allPoints, 3)
+  );
+
+  return new Points(geometry, this.material);
+}
+
+/**
+ * 从网格几何体创建点
+ */
+private async createPointsFromMeshes(): Promise<Points> {
+  const json = this.json;
+  const meshes = json.meshes || [];
+  
+  // 收集所有网格加载的Promise
+  const meshPromises = meshes.map((_, index) => 
+    this.loadMesh(index)
+      .then(mesh => {
+        const positions: number[] = [];
+        
+        mesh.traverse((object: any) => {
+          if (object.isMesh || object.isPoints) {
+            const geometry = object.geometry;
+            const positionAttr = geometry.attributes.position;
+            
+            if (positionAttr) {
+              for (let j = 0; j < positionAttr.count; j++) {
+                positions.push(
+                  positionAttr.getX(j),
+                  positionAttr.getY(j),
+                  positionAttr.getZ(j)
+                );
+              }
             }
           }
-        }
-      });
-    }
+        });
+        
+        return positions;
+      })
+      .catch(error => {
+        console.warn(`加载网格 ${index} 失败:`, error);
+        return [];
+      })
+  );
 
-    if (allPositions.length === 0) {
-      throw new Error('PointsParser: 未找到几何体数据');
-    }
+  // 等待所有网格加载完成
+  const allPositionArrays = await Promise.all(meshPromises);  
+  const allPositions = allPositionArrays.flat();
 
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new BufferAttribute(new Float32Array(allPositions), 3)
-    );
-
-    const material = new PointsMaterial({ color: 0xffffff, size: 1 });
-    return new Points(geometry, material);
+  if (allPositions.length === 0) {
+    throw new Error('PointsParser: 未找到几何体数据');
   }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new BufferAttribute(new Float32Array(allPositions), 3)
+  );
+  return new Points(geometry, this.material);
+}
 
   /**
    * 加载原始几何体
@@ -177,7 +219,7 @@ export class PointsParser extends GLTFParser {
     for (const [name, accessorIndex] of Object.entries(attributes)) {
       pendingAttributes.push(
         this.getDependency('accessor', accessorIndex as number).then(attribute => {
-          geometry.setAttribute(name, attribute as BufferAttribute);
+          geometry.setAttribute(name.toLowerCase(), attribute as BufferAttribute);
         })
       );
     }
@@ -192,6 +234,7 @@ export class PointsParser extends GLTFParser {
     }
     
     await Promise.all(pendingAttributes);
+    console.log('geometry loaded:', geometry);
     
     return geometry;
   }
@@ -199,7 +242,7 @@ export class PointsParser extends GLTFParser {
   /**
    * 重写loadMesh方法，只处理点模式
    */
-  override async loadMesh(meshIndex: number): Promise<THREE.Group | THREE.Mesh | THREE.SkinnedMesh | THREE.Line | THREE.Points> {
+  override async loadMesh(meshIndex: number): Promise<Group | Mesh | SkinnedMesh | Line | Points> {
     const json = this.json;
     const meshes = json.meshes || [];
     const meshDef = meshes[meshIndex];
@@ -220,13 +263,11 @@ export class PointsParser extends GLTFParser {
       );
       
       if (geometries.length === 1) {
-        const material = new PointsMaterial({ color: 0xffffff, size: 1 });
-        return new Points(geometries[0], material);
+        return new Points(geometries[0], this.material);
       } else {
-        const group = new THREE.Group();
+        const group = new Group();
         geometries.forEach(geometry => {
-          const material = new PointsMaterial({ color: 0xffffff, size: 1 });
-          group.add(new Points(geometry, material));
+          group.add(new Points(geometry, this.material));
         });
         return group;
       }

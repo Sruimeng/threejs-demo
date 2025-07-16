@@ -5,6 +5,8 @@ import { GLTFBinaryExtension, loadExtension } from '../gltf/extensions';
 import { PointsParser } from './PointsParser';
 import type { GLTFLoaderOptions } from '../gltf/constants';
 import { LoaderOptions } from '../constants';
+import { PointCloudMaterial } from './PointCloudMaterial';
+import { Color } from 'three';
 
 /**
  * A specialized loader for GLTF/GLB files that only loads points data
@@ -125,6 +127,6 @@ export class PointsGLTFLoader extends GLTFLoader {
   
       parser.setExtensions(extensions);
       parser.setPlugins(plugins);
-      parser.parse(onLoad, onError, this.wireframe);
+      parser.parse(onLoad, onError);
     }
 }

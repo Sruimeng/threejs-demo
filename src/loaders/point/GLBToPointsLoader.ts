@@ -1,7 +1,7 @@
 // 废弃文件
 import * as THREE from 'three';
 import { GLTFLoader } from '../gltf';
-import { PointCloudMaterial } from '../../materials/PointCloudMaterial';
+import { PointCloudMaterial } from './PointCloudMaterial';
 
 export class GLBToPointsLoader extends THREE.Loader {
   public density: number = 100;

@@ -46,7 +46,7 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       color2 = new THREE.Color(0xff00ff),
       pointSize = 0.1,
       opacity = 0.8,
-      flowSpeed = 0.4,
+      flowSpeed = 1.4,
       noiseScale = 3.0,
       flowStrength = 0.1,
       transitionProgress = 0.0,

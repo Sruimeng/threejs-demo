@@ -36,14 +36,17 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({ url, loadAsPoints = fa
   if (!data) return <div>No model loaded</div>;
 
   // 确定要渲染的内容
-  let objectToRender: THREE.Object3D;
+  let objectToRender: THREE.Object3D | THREE.Points;
   if (data instanceof THREE.Object3D) {
     objectToRender = data;
+  }  else if ('points' in data) { // GLTF 对象
+    objectToRender = data.points as THREE.Points;
   } else if ('scene' in data) { // GLTF 对象
     objectToRender = data.scene;
   } else if (data instanceof THREE.Group) { // FBX 或其他组
     objectToRender = data;
   } else {
+    debugger
     console.error('Unsupported model format:', data);
     return <div>Unsupported model format</div>;
   }
