@@ -28,12 +28,12 @@ export class PointsParser extends GLTFParser {
         this.material = new PointCloudMaterial({
       color1: new Color(0x00ffff),
       color2: new Color(0xffffff),
-      pointSize: 4,
-      opacity: 0.8,
-      flowSpeed: 1.4,
-      noiseScale: 3.0,
-      flowStrength: 0.1,
-      transitionProgress: 0.0,
+    pointSize: 6, // 增大点的大小
+    opacity: 0.9,
+    flowSpeed: 2.0, // 增加流动速度
+    noiseScale: 2.0, // 减小噪声尺度，使效果更密集
+    flowStrength: 0.3, // 增加流动强度
+    transitionProgress: 0.5, // 设置中间值看到颜色混合
     })
   }
 
