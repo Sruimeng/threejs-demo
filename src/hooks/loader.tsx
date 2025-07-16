@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from '../loaders/gltf/GLTF-loader';
 import { FBXLoader } from '../loaders/fbx/FBX-loader';
-import { GLBToPointsLoader } from '../loaders/point/GLBToPointsLoader';
+import { PointsGLTFLoader } from '../loaders/point';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 type ModelDataType = GLTF | THREE.Group | THREE.Points;
@@ -37,8 +37,7 @@ export const useLoader = (url: string, options: LoaderOptions = {}): ModelLoader
         let model;
 
         if (loadAsPoints && (extension === 'gltf' || extension === 'glb')) {
-          const loader = new GLBToPointsLoader();
-          loader.setDensity(pointDensity);
+          const loader = new PointsGLTFLoader();
           model = await new Promise<THREE.Points>((resolve, reject) => {
             loader.load(url, resolve, undefined, reject);
           });
