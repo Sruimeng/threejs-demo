@@ -1,3 +1,4 @@
+// 废弃文件
 import * as THREE from 'three';
 import { GLTFLoader } from '../gltf';
 import { PointCloudMaterial } from '../../materials/PointCloudMaterial';
